@@ -1,14 +1,53 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Estoque Corporativo | Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>360virtu stock</title>
+
+    <meta name="theme-color" content="#1e293b">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="style.css">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+
 </head>
+
 <body>
+    <div id="snackbar-container"></div>
+    <div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleMenu()"></div>
+
+    <div id="login-screen"
+        style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--sidebar-bg); z-index: 9999; display: flex; align-items: center; justify-content: center;">
+        <div
+            style="background: var(--card-bg); padding: 40px; border-radius: 12px; width: 100%; max-width: 350px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+            <div style="color: var(--primary); font-size: 3rem; margin-bottom: 10px;"><i class="ph ph-cpu"></i></div>
+            <h2 style="margin-bottom: 25px; color: var(--text-main);">360virtu stock</h2>
+            <form onsubmit="fazerLogin(event)">
+                <input type="text" id="login-user" placeholder="Usuário" required
+                    style="width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid var(--border); border-radius: 6px;">
+                <input type="password" id="login-pass" placeholder="Senha" required
+                    style="width: 100%; padding: 12px; margin-bottom: 25px; border: 1px solid var(--border); border-radius: 6px;">
+                <button type="submit" class="btn-primary"
+                    style="width: 100%; justify-content: center; padding: 12px; font-size: 1rem;">Entrar no
+                    Sistema</button>
+            </form>
+            <hr style="margin: 20px 0; border: 0; border-top: 1px solid var(--border);">
+            <button type="button" onclick="abrirModalFuncionario()"
+                style="width: 100%; background: transparent; border: 1px solid var(--primary); color: var(--primary); padding: 10px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: 0.3s;">
+                Criar Nova Conta
+            </button>
+        </div>
+    </div>
+
+    <input type="file" id="input-trocar-foto" accept="image/*" style="display: none;" onchange="enviarNovaFoto()">
+    <input type="hidden" id="produto-id-foto">
+
     <div class="app-container">
         <aside class="sidebar">
             <div class="logo">
@@ -16,156 +55,686 @@
                 <h2>360 Stock</h2>
             </div>
             <nav>
-                <a href="#" class="active"><i class="ph ph-squares-four"></i> Dashboard</a>
-                <a href="#"><i class="ph ph-microchip"></i> Componentes</a>
-                <a href="#"><i class="ph ph-factory"></i> Produção (BOM)</a>
-                <a href="#"><i class="ph ph-airplane-tilt"></i> Importações</a>
+                <a href="#" id="menu-dashboard" class="active" onclick="mudarAba('dashboard')"><i
+                        class="ph ph-squares-four"></i> Dashboard Geral</a>
+                <a href="#" id="menu-importacoes" onclick="mudarAba('importacoes')"><i class="ph ph-airplane-tilt"></i>
+                    Importações</a>
+                <a href="#" id="menu-historico" onclick="mudarAba('historico')"><i
+                        class="ph ph-clock-counter-clockwise"></i> Auditoria</a>
+                <a href="#" id="menu-pedidos" onclick="mudarAba('pedidos')"><i
+                        class="ph ph-shopping-bag"></i> Pedidos</a>
+                <a href="#" id="menu-equipe" onclick="mudarAba('equipe')"><i class="ph ph-users"></i> Gestão de
+                    Equipe</a>
+                <a href="#" id="menu-engenharia" onclick="mudarAba('engenharia')"><i class="ph ph-factory"></i>
+                    Engenharia (BOM)</a>
+                <a href="#" onclick="mostrarQRCode()" style="color: #3b82f6;"><i class="ph ph-qr-code"></i> Acesso
+                    Mobile</a>
             </nav>
             <div class="user-profile">
-                <div class="avatar">L</div>
+                <div class="avatar"><i class="ph ph-user"></i></div>
                 <div class="info">
-                    <span>Lucas (CEO)</span>
-                    <small>Equipe c/ Vanderson</small>
+                    <span>Usuário</span>
+                    <small>Equipe Operacional</small>
                 </div>
             </div>
+            <button onclick="toggleDarkMode()" class="btn-theme-toggle" id="theme-toggle-btn">
+                <i class="ph ph-moon"></i>
+                <span>Modo Escuro</span>
+            </button>
+            <button onclick="sairDoSistema()"
+                style="margin-top: 15px; background: transparent; border: 1px solid #64748b; color: #94a3b8; padding: 8px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; width: 100%; transition: 0.3s;">
+                <i class="ph ph-sign-out"></i> Sair da Conta
+            </button>
         </aside>
 
         <main class="main-content">
             <header>
-                <h1>Visão Geral da Operação</h1>
-                <div style="display: flex; gap: 10px;">
-                    <button class="btn-secondary" onclick="abrirModalCompra()"><i class="ph ph-airplane-tilt"></i> Nova Importação</button>
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <button class="menu-toggle" onclick="toggleMenu()"><i class="ph ph-list"></i></button>
+                    <h1 style="font-size: 1.5rem;">Visão Geral</h1>
+                </div>
+                <div class="header-actions">
+                    <button class="btn-secondary" onclick="abrirModalPlanilha()"><i
+                            class="ph ph-microsoft-excel-logo"></i> Importar Planilha</button>
+                    <button class="btn-secondary" onclick="abrirModalCompra()"><i class="ph ph-airplane-tilt"></i> Nova
+                        Importação</button>
+                    <button class="btn-secondary" onclick="abrirModalProducao()"><i class="ph ph-hammer"></i> Dar
+                        Baixa</button>
                     <button class="btn-primary" onclick="abrirModal()"><i class="ph ph-plus"></i> Novo Item</button>
                 </div>
             </header>
 
-            <section class="summary-cards">
-                <div class="card">
-                    <div class="card-icon"><i class="ph ph-box-arrow-down"></i></div>
-                    <div class="card-info">
-                        <h3>Itens em Estoque</h3>
-                        <h2 id="total-items">0</h2>
+            <div id="view-dashboard">
+                <section class="summary-cards">
+                    <div class="card">
+                        <div class="card-icon"><i class="ph ph-box-arrow-down"></i></div>
+                        <div class="card-info">
+                            <h3>Itens em Estoque</h3>
+                            <h2 id="total-items">0</h2>
+                        </div>
                     </div>
-                </div>
-                <div class="card alert">
-                    <div class="card-icon"><i class="ph ph-warning-circle"></i></div>
-                    <div class="card-info">
-                        <h3>Estoque Crítico</h3>
-                        <h2 id="critical-items">0</h2>
+                    <div class="card alert" style="cursor: pointer; transition: 0.2s;" onclick="abrirModalCriticos()"
+                        onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                        <div class="card-icon"><i class="ph ph-warning-circle"></i></div>
+                        <div class="card-info">
+                            <h3>Estoque Crítico</h3>
+                            <h2 id="critical-items">0</h2>
+                        </div>
                     </div>
-                </div>
-            </section>
+                </section>
 
-            <section class="data-section">
-                <h2>Inventário Atual</h2>
-                <div class="table-container">
-                    <table id="products-table">
-                        <thead>
-                            <tr>
-                                <th>Foto</th>
-                                <th>SKU</th>
-                                <th>Nome</th>
-                                <th>Categoria</th>
-                                <th>Estoque</th>
-                                <th>Ação</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            </tbody>
-                    </table>
-                </div>
-            </section>
+                <section class="data-section">
+                    <div class="inventory-header"
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h2>Inventário Atual</h2>
+                        <div class="search-and-cols-container">
+                            <div class="search-container" style="position: relative; width: 280px; margin: 0;">
+                                <i class="ph ph-magnifying-glass"
+                                    style="position: absolute; left: 10px; top: 12px; color: var(--text-muted); font-size: 1.2rem;"></i>
+                                <input type="text" id="filtro-produtos" onkeyup="filtrarTabela()"
+                                    placeholder="Buscar por nome, SKU..."
+                                    style="width: 100%; padding: 10px 10px 10px 35px; border-radius: 8px; border: 1px solid var(--border); outline: none;">
+                            </div>
+                            <div class="dropdown-wrapper">
+                                <button class="btn-secondary toggle-columns-btn"
+                                    onclick="toggleDropdownColumns('products-table', event)">
+                                    <i class="ph ph-eye"></i> Colunas
+                                </button>
+                                <div id="dropdown-cols-products-table" class="columns-dropdown-menu"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table id="products-table">
+                            <thead>
+                                <tr>
+                                    <th>Foto</th>
+                                    <th onclick="ordenarTabela(1)" style="cursor:pointer; color:var(--primary);"
+                                        title="Clique para ordenar">Nome <i class="ph ph-arrows-down-up"></i></th>
+                                    <th onclick="ordenarTabela(2)" style="cursor:pointer; color:var(--primary);"
+                                        title="Clique para ordenar">SKU <i class="ph ph-arrows-down-up"></i></th>
+                                    <th onclick="ordenarTabela(3)" style="cursor:pointer; color:var(--primary);"
+                                        title="Clique para ordenar">Categoria <i class="ph ph-arrows-down-up"></i></th>
+                                    <th onclick="ordenarTabela(4)" style="cursor:pointer; color:var(--primary);"
+                                        title="Clique para ordenar">Fornecedor <i class="ph ph-arrows-down-up"></i></th>
+                                    <th onclick="ordenarTabela(5)" style="cursor:pointer; color:var(--primary);"
+                                        title="Clique para ordenar">Estoque <i class="ph ph-arrows-down-up"></i></th>
+                                    <th>Ação</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <div id="view-importacoes" style="display: none;">
+                <section class="data-section">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                        <h2>Cargas a Caminho (China / Fornecedores)</h2>
+                        <div class="dropdown-wrapper">
+                            <button class="btn-secondary toggle-columns-btn"
+                                onclick="toggleDropdownColumns('imports-table', event)">
+                                <i class="ph ph-eye"></i> Colunas
+                            </button>
+                            <div id="dropdown-cols-imports-table" class="columns-dropdown-menu"></div>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table id="imports-table">
+                            <thead>
+                                <tr>
+                                    <th>SKU / Produto</th>
+                                    <th>Volume</th>
+                                    <th>Previsão</th>
+                                    <th>Prioridade</th>
+                                    <th>Ação</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <div id="view-historico" style="display: none;">
+                <section class="data-section">
+                    <h2>Linha do Tempo da Operação</h2>
+                    <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; align-items: center;">
+                        <button class="btn-primary" style="background-color: #10b981;"
+                            onclick="exportarTabelaParaExcel('history-table', 'Relatorio_Excel')">
+                            <i class="ph ph-file-xls"></i> Exportar Excel
+                        </button>
+                        <button class="btn-primary" style="background-color: #0f9d58;"
+                            onclick="exportarParaGooglePlanilhas()">
+                            <i class="ph ph-google-logo"></i> Exportar para Google Planilhas
+                        </button>
+                        <div class="dropdown-wrapper">
+                            <button class="btn-secondary toggle-columns-btn"
+                                onclick="toggleDropdownColumns('history-table', event)">
+                                <i class="ph ph-eye"></i> Colunas
+                            </button>
+                            <div id="dropdown-cols-history-table" class="columns-dropdown-menu"></div>
+                        </div>
+                    </div>
+                    <div class="table-container" style="display: none;">
+                        <table id="history-table">
+                            <thead>
+                                <tr>
+                                    <th>Data/Hora</th>
+                                    <th>Funcionário</th>
+                                    <th>Ação</th>
+                                    <th>Item</th>
+                                    <th>Qtd.</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <div id="history-grouped-container"></div>
+                </section>
+            </div>
+
+            <div id="view-pedidos" style="display: none;">
+                <section class="data-section">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+                        <h2>Pedidos dos Clientes</h2>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <div class="dropdown-wrapper" id="dropdown-colunas-pedidos-wrapper" style="display: none;">
+                                <button class="btn-secondary toggle-columns-btn" onclick="toggleDropdownColumns('orders-table', event)">
+                                    <i class="ph ph-eye"></i> Colunas
+                                </button>
+                                <div id="dropdown-cols-orders-table" class="columns-dropdown-menu"></div>
+                            </div>
+                            <button class="btn-primary" id="btn-exportar-pedidos" onclick="abrirModalExportarPedidos()" style="background-color: #10b981; display: none;">
+                                <i class="ph ph-file-xls"></i> Exportar CSV
+                            </button>
+                            <button class="btn-primary" id="btn-novo-pedido" onclick="abrirModalPedido()"><i class="ph ph-plus"></i> Novo Pedido</button>
+                        </div>
+                    </div>
+                    <table id="orders-table" style="display: none;"></table>
+                    
+                    <div class="kanban-board" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
+                        <!-- Coluna Fila -->
+                        <div class="kanban-column" style="background: var(--card-bg); border-radius: 12px; padding: 15px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 15px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #3b82f6; padding-bottom: 8px;">
+                                <h3 style="margin: 0; font-size: 1.1rem; color: var(--text-main); display: flex; align-items: center; gap: 8px;"><i class="ph ph-hourglass-high" style="color: #3b82f6;"></i> Fila (Produção)</h3>
+                                <span id="count-fila" style="background: #3b82f6; color: #fff; padding: 2px 8px; border-radius: 20px; font-size: 0.8rem; font-weight: bold;">0</span>
+                            </div>
+                            <div id="fila-pedidos" style="display: flex; flex-direction: column; gap: 12px; min-height: 200px;">
+                                <!-- Cards de pedidos na Fila -->
+                            </div>
+                        </div>
+
+                        <!-- Coluna Enviados -->
+                        <div class="kanban-column" style="background: var(--card-bg); border-radius: 12px; padding: 15px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 15px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #10b981; padding-bottom: 8px;">
+                                <h3 style="margin: 0; font-size: 1.1rem; color: var(--text-main); display: flex; align-items: center; gap: 8px;"><i class="ph ph-check-circle" style="color: #10b981;"></i> Enviados (Últimas 2 semanas)</h3>
+                                <span id="count-enviados" style="background: #10b981; color: #fff; padding: 2px 8px; border-radius: 20px; font-size: 0.8rem; font-weight: bold;">0</span>
+                            </div>
+                            <div id="enviados-pedidos" style="display: flex; flex-direction: column; gap: 12px; min-height: 200px;">
+                                <!-- Cards de pedidos Enviados -->
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <div id="view-equipe" style="display: none;">
+                <section class="data-section">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+                        <h2>Acessos ao Sistema</h2>
+                        <button class="btn-primary" onclick="abrirModalFuncionario()"><i class="ph ph-user-plus"></i>
+                            Novo Funcionário</button>
+                    </div>
+                    <div id="grid-equipe"
+                        style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px;">
+                    </div>
+                </section>
+            </div>
+
+            <div id="view-engenharia" style="display: none;">
+                <section class="data-section">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+                        <h2>Engenharia de Produtos (BOM - Árvore de Receitas)</h2>
+                        <div class="card"
+                            style="padding: 10px 20px; border-radius: 8px; display: flex; align-items: center; gap: 10px; margin: 0; box-shadow: none;">
+                            <div class="card-icon" style="font-size: 1.5rem;"><i class="ph ph-factory"></i></div>
+                            <div class="card-info">
+                                <h3 style="font-size: 0.8rem; margin: 0;">Total de Receitas</h3>
+                                <h2 id="total-receitas" style="font-size: 1.2rem; margin: 0;">0</h2>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start;">
+                        <!-- Coluna 1: Lista de Receitas existentes -->
+                        <div style="flex: 1.5; min-width: 320px; display: flex; flex-direction: column; gap: 10px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <h3 style="font-size: 1rem; margin: 0; color: var(--text-main); font-weight: 600;">
+                                    Composições Ativas</h3>
+                                <div class="dropdown-wrapper">
+                                    <button class="btn-secondary toggle-columns-btn"
+                                        onclick="toggleDropdownColumns('receitas-table', event)">
+                                        <i class="ph ph-eye"></i> Colunas
+                                    </button>
+                                    <div id="dropdown-cols-receitas-table" class="columns-dropdown-menu"></div>
+                                </div>
+                            </div>
+                            <div class="table-container">
+                                <table id="receitas-table" style="min-width: 100%;">
+                                    <thead>
+                                        <tr>
+                                            <th>Produto Final</th>
+                                            <th>SKU</th>
+                                            <th>Categoria</th>
+                                            <th>Componentes</th>
+                                            <th style="width: 120px;">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td colspan="5" style="text-align: center; color: var(--text-muted);">
+                                                Buscando receitas...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Coluna 2: Formulário Criar/Editar Receita -->
+                        <div
+                            style="flex: 1; min-width: 320px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px; box-shadow: var(--shadow-md);">
+                            <h3 id="titulo-editor-bom"
+                                style="margin-bottom: 15px; font-size: 1.1rem; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+                                <i class="ph ph-plus-circle"></i> Criar Nova Receita</h3>
+                            <form id="form-receita" onsubmit="salvarReceita(event)">
+                                <div class="input-group" style="margin-bottom: 15px;">
+                                    <label>Produto Final</label>
+                                    <select id="bom_produto_id" required onchange="aoSelecionarProdutoPai(this.value)">
+                                        <option value="">Selecione o produto...</option>
+                                    </select>
+                                    <small
+                                        style="color: var(--text-muted); font-size: 0.75rem; margin-top: 4px;">Escolha o
+                                        produto final ou submontagem para associar os insumos.</small>
+                                </div>
+
+                                <div style="margin-top: 20px; margin-bottom: 20px;">
+                                    <label
+                                        style="font-size: 0.85rem; font-weight: 600; color: var(--text-main); display: block; margin-bottom: 10px;">Insumos
+                                        / Componentes Necessários:</label>
+                                    <div id="lista-componentes"
+                                        style="display: flex; flex-direction: column; gap: 10px;"></div>
+                                    <button type="button" class="btn-secondary"
+                                        style="margin-top: 10px; width: 100%; font-size: 0.85rem; padding: 10px; display: flex; align-items: center; justify-content: center; gap: 5px;"
+                                        onclick="adicionarLinhaInsumo()">
+                                        <i class="ph ph-plus"></i> Adicionar Componente
+                                    </button>
+                                </div>
+
+                                <div
+                                    style="display: flex; gap: 10px; border-top: 1px solid var(--border); padding-top: 15px; margin-top: 15px;">
+                                    <button type="button" class="btn-secondary" style="flex: 1;"
+                                        onclick="limparEditorBOM()">Limpar</button>
+                                    <button type="submit" class="btn-primary"
+                                        style="flex: 1; justify-content: center;">Salvar Receita</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </section>
+            </div>
         </main>
     </div>
 
     <script src="app.js"></script>
-<div id="modal-novo-item" class="modal-overlay" style="display: none;">
+
+    <div id="modal-novo-item" class="modal-overlay" style="display: none; z-index: 1000;">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Cadastrar Novo Item</h2>
-                <button onclick="fecharModal()" class="btn-close"><i class="ph ph-x"></i></button>
+                <h2>Cadastrar Novo Item</h2><button onclick="fecharModal()" class="btn-close"><i
+                        class="ph ph-x"></i></button>
             </div>
-            
             <form id="form-produto" onsubmit="salvarProduto(event)">
                 <div class="form-grid">
+                    <div class="input-group"><label>Nome</label><input type="text" id="nome" required></div>
+                    <div class="input-group"><label>SKU</label><input type="text" id="sku"
+                            placeholder="Deixe em branco para auto-gerar"></div>
+                    <div class="input-group"><label>Categoria</label><input type="text" id="categoria" required></div>
+                    <div class="input-group"><label>Fornecedor</label><input type="text" id="fornecedor"
+                            placeholder="Ex: 360virtu"></div>
                     <div class="input-group">
-                        <label>Nome do Item</label>
-                        <input type="text" id="nome" placeholder="Ex: Sensor TCS34725" required>
+                        <label>Tipo</label>
+                        <select id="is_manufactured" required>
+                            <option value="0">Matéria Prima (Apenas Compro)</option>
+                            <option value="2">Submontagem (Misto)</option>
+                            <option value="1">Produto Final (Apenas Fabrico)</option>
+                        </select>
                     </div>
-                    <div class="input-group">
-                        <label>SKU / Código</label>
-                        <input type="text" id="sku" placeholder="Ex: SEN-TCS-001" required>
-                    </div>
+                    <div class="input-group" style="grid-column: span 2;"><label>Foto</label><input type="file"
+                            id="foto" accept="image/*"></div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn-secondary"
+                        onclick="fecharModal()">Cancelar</button><button type="submit"
+                        class="btn-primary">Salvar</button></div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-ajuste-estoque" class="modal-overlay" style="display: none; z-index: 1000;">
+        <div class="modal-content" style="max-width: 450px;">
+            <div class="modal-header">
+                <h2>Editar Item / Ajuste</h2>
+                <button type="button" onclick="fecharModalAjuste()" class="btn-close"><i class="ph ph-x"></i></button>
+            </div>
+            <form onsubmit="salvarAjusteEstoque(event)">
+                <input type="hidden" id="ajuste_produto_id">
+
+                <div class="input-group" style="margin-bottom: 15px;">
+                    <label>Nome do Produto</label>
+                    <input type="text" id="ajuste_nome" required>
+                </div>
+
+                <div class="form-grid" style="margin-bottom: 15px;">
                     <div class="input-group">
                         <label>Categoria</label>
-                        <select id="categoria" required>
-                            <option value="Componente">Componente (Eletrônica)</option>
-                            <option value="Microcontrolador">Microcontrolador (ESP/Arduino)</option>
-                            <option value="Usinagem">Usinagem / Impressão 3D</option>
-                            <option value="Placa Pronta">Placa Pronta (Produto Final)</option>
-                            <option value="Fio/Cabo">Fios e Cabos</option>
-                        </select>
+                        <input type="text" id="ajuste_categoria" required>
                     </div>
                     <div class="input-group">
-                        <label>Tipo de Item</label>
-                        <select id="is_manufactured">
-                            <option value="0">Matéria Prima (Eu Compro)</option>
-                            <option value="1">Produto Final (Eu Fabrico)</option>
-                        </select>
-                    </div>
-                    <div class="input-group" style="grid-column: span 2;">
-                        <label>Foto do Produto</label>
-                        <input type="file" id="foto" accept="image/*">
+                        <label>Fornecedor</label>
+                        <input type="text" id="ajuste_fornecedor" placeholder="Ex: 360virtu">
                     </div>
                 </div>
-                
-                <div class="modal-footer">
-                    <button type="button" class="btn-secondary" onclick="fecharModal()">Cancelar</button>
-                    <button type="submit" class="btn-primary">Salvar no Estoque</button>
+
+                <div class="input-group" style="margin-bottom: 15px;">
+                    <label>Tipo</label>
+                    <select id="ajuste_tipo" required>
+                        <option value="0">Matéria Prima</option>
+                        <option value="2">Submontagem</option>
+                        <option value="1">Produto Final</option>
+                    </select>
+                </div>
+
+                <div class="input-group" style="margin-bottom: 15px;">
+                    <label>Quantidade Física Atual</label>
+                    <input type="number" id="ajuste_quantidade" step="any" required>
+                </div>
+
+                <div class="modal-footer"
+                    style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; border-top: 1px solid var(--border); padding-top: 15px;">
+                    <button type="button" id="btn-excluir-produto" onclick="excluirProduto()"
+                        style="background: none; border: none; color: var(--danger); font-size: 1.5rem; cursor: pointer;"
+                        title="Excluir Item">
+                        <i class="ph ph-trash"></i>
+                    </button>
+                    <div style="display: flex; gap: 10px;">
+                        <button type="button" class="btn-secondary" onclick="fecharModalAjuste()">Cancelar</button>
+                        <button type="submit" class="btn-primary">Salvar Alterações</button>
+                    </div>
                 </div>
             </form>
         </div>
     </div>
-    <div id="modal-nova-compra" class="modal-overlay" style="display: none;">
+
+    <div id="modal-producao" class="modal-overlay" style="display: none; z-index: 1000;">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Registrar Compra (Importação/Local)</h2>
-                <button onclick="fecharModalCompra()" class="btn-close"><i class="ph ph-x"></i></button>
+                <h2>Registrar Produção</h2><button onclick="fecharModalProducao()" class="btn-close"><i
+                        class="ph ph-x"></i></button>
             </div>
-            
+            <form onsubmit="salvarProducao(event)">
+                <div class="form-grid">
+                    <div class="input-group" style="grid-column: span 2;"><label>O que você fabricou?</label><select
+                            id="prod_produto_id" required></select></div>
+                    <div class="input-group" style="grid-column: span 2;"><label>Quantidade Fabricada</label><input
+                            type="number" id="prod_quantidade" min="1" value="1" required></div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn-secondary"
+                        onclick="fecharModalProducao()">Cancelar</button><button type="submit" class="btn-primary">Dar
+                        Baixa nas Peças</button></div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-nova-compra" class="modal-overlay" style="display: none; z-index: 1000;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Registrar Importação</h2><button onclick="fecharModalCompra()" class="btn-close"><i
+                        class="ph ph-x"></i></button>
+            </div>
             <form id="form-compra" onsubmit="salvarCompra(event)">
                 <div class="form-grid">
-                    <div class="input-group" style="grid-column: span 2;">
-                        <label>Item Comprado</label>
-                        <select id="compra_produto_id" required>
-                            <option value="">Carregando produtos...</option>
-                            </select>
-                    </div>
-                    <div class="input-group">
-                        <label>Quantidade Solicitada</label>
-                        <input type="number" id="compra_quantidade" min="1" placeholder="Ex: 50" required>
-                    </div>
-                    <div class="input-group">
-                        <label>Previsão de Chegada</label>
-                        <input type="date" id="compra_previsao" required>
+                    <div class="input-group" style="grid-column: span 2;"><label>Item Comprado</label><select
+                            id="compra_produto_id" required></select></div>
+                    <div class="input-group"><label>Quantidade</label><input type="number" id="compra_quantidade"
+                            min="1" required></div>
+                    <div class="input-group"><label>Previsão</label><input type="date" id="compra_previsao" required>
                     </div>
                     <div class="input-group" style="grid-column: span 2;">
-                        <label>Prioridade da Carga</label>
+                        <label>Prioridade</label>
                         <select id="compra_prioridade" required>
-                            <option value="Baixa">Baixa (Pode atrasar)</option>
                             <option value="Média" selected>Média (Normal)</option>
-                            <option value="Alta">Alta (Estoque ficando baixo)</option>
-                            <option value="Crítica">Crítica (Risco de parar a produção)</option>
+                            <option value="Alta">Alta</option>
+                            <option value="Crítica">Crítica</option>
                         </select>
                     </div>
                 </div>
-                
+                <div class="modal-footer"><button type="button" class="btn-secondary"
+                        onclick="fecharModalCompra()">Cancelar</button><button type="submit"
+                        class="btn-primary">Registrar Pedido</button></div>
+            </form>
+        </div>
+    </div>
+
+
+
+    <div id="modal-novo-funcionario" class="modal-overlay" style="display: none; z-index: 999999;">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h2>Cadastrar Funcionário</h2><button onclick="fecharModalFuncionario()" class="btn-close"><i
+                        class="ph ph-x"></i></button>
+            </div>
+            <form id="form-funcionario" onsubmit="salvarFuncionario(event)">
+                <div class="input-group" style="margin-bottom: 15px;"><label>Nome Completo</label><input type="text"
+                        id="func_nome" required></div>
+                <div class="input-group" style="margin-bottom: 15px;"><label>Usuário (Login)</label><input type="text"
+                        id="func_usuario" required></div>
+                <div class="input-group" style="margin-bottom: 15px;"><label>Senha</label><input type="password"
+                        id="func_senha" required></div>
+                <div class="input-group" style="margin-bottom: 25px;">
+                    <label>Cargo / Função</label>
+                    <select id="func_role" required
+                        style="width:100%; padding:10px; border:1px solid var(--border); border-radius:6px; outline:none; background-color:var(--card-bg); color:var(--text-main);">
+                        <option value="operator" selected>Operador</option>
+                        <option value="technician">Técnico</option>
+                        <option value="admin">Gestor</option>
+                    </select>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn-secondary"
+                        onclick="fecharModalFuncionario()">Cancelar</button><button type="submit"
+                        class="btn-primary">Finalizar Cadastro</button></div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-criticos" class="modal-overlay" style="display: none; z-index: 9999;">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2 style="color: var(--danger); display: flex; align-items: center; gap: 8px;"><i
+                        class="ph ph-warning-circle"></i> Atenção: Estoque Crítico</h2><button
+                    onclick="fecharModalCriticos()" class="btn-close"><i class="ph ph-x"></i></button>
+            </div>
+            <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 0.9rem;">Estes itens estão abaixo da
+                margem de segurança e podem travar a produção.</p>
+            <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+                <table id="tabela-criticos" style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th>Produto / Componente</th>
+                            <th>Estoque Atual</th>
+                            <th>Mínimo Exigido</th>
+                            <th>Risco</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div class="modal-footer" style="margin-top: 20px;">
+                <button type="button" class="btn-secondary" onclick="fecharModalCriticos()">Fechar</button>
+                <button type="button" class="btn-primary" onclick="fecharModalCriticos(); abrirModalCompra();"><i
+                        class="ph ph-shopping-cart"></i> Solicitar Compra</button>
+            </div>
+        </div>
+    </div>
+    <div id="modal-notificacao" class="modal-overlay" style="display: none; z-index: 9999999;">
+        <div class="modal-content" style="max-width: 350px; text-align: center; padding: 35px 20px 25px 20px;">
+            <div id="notificacao-icone" style="font-size: 4rem; margin-bottom: 10px;"></div>
+            <h2 id="notificacao-titulo" style="margin-bottom: 10px; color: var(--text-main); font-size: 1.4rem;">Aviso
+            </h2>
+            <p id="notificacao-mensagem"
+                style="color: var(--text-muted); margin-bottom: 25px; line-height: 1.5; font-size: 0.95rem;"></p>
+            <button class="btn-primary" style="width: 100%; justify-content: center; padding: 12px; font-size: 1rem;"
+                onclick="fecharNotificacao()">OK, Entendi</button>
+        </div>
+    </div>
+    <div id="modal-confirmacao" class="modal-overlay" style="display: none; z-index: 9999999;">
+        <div class="modal-content" style="max-width: 350px; text-align: center; padding: 35px 20px 25px 20px;">
+            <div style="font-size: 4rem; margin-bottom: 10px; color: var(--danger);"><i
+                    class="ph ph-warning-circle"></i></div>
+            <h2 style="margin-bottom: 10px; color: var(--text-main); font-size: 1.4rem;">Atenção</h2>
+            <p id="confirmacao-mensagem"
+                style="color: var(--text-muted); margin-bottom: 25px; line-height: 1.5; font-size: 0.95rem;"></p>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button class="btn-secondary" style="flex: 1;" onclick="fecharConfirmacao()">Cancelar</button>
+                <button class="btn-primary"
+                    style="flex: 1; background-color: var(--danger); border-color: var(--danger);"
+                    id="btn-confirmar-acao">Sim, Continuar</button>
+            </div>
+        </div>
+    </div>
+    <div id="modal-planilha" class="modal-overlay" style="display: none; z-index: 1000;">
+        <div class="modal-content" style="max-width: 450px;">
+            <div class="modal-header">
+                <h2>Importar Lote (CSV)</h2><button onclick="fecharModalPlanilha()" class="btn-close"><i
+                        class="ph ph-x"></i></button>
+            </div>
+            <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 0.9rem;">
+                No Excel, salve sua planilha como <strong>CSV (separado por vírgulas ou ponto e
+                    vírgula)</strong>.<br><br>
+                <strong>A ordem exata das colunas deve ser:</strong><br>
+                1. Nome do Produto<br>2. SKU (deixe em branco para AUTO)<br>3. Categoria<br>4. Tipo (0=Compra, 1=Final,
+                2=Submontagem)<br>5. Quantidade Atual
+            </p>
+            <form onsubmit="processarPlanilha(event)">
+                <div class="input-group" style="margin-bottom: 20px;">
+                    <label>Arquivo da Planilha (.csv)</label>
+                    <input type="file" id="arquivo-csv" accept=".csv" required style="padding: 10px;">
+                </div>
+                <div class="modal-footer"><button type="button" class="btn-secondary"
+                        onclick="fecharModalPlanilha()">Cancelar</button><button type="submit" class="btn-primary"
+                        style="background-color: #10b981;">Processar Carga</button></div>
+            </form>
+        </div>
+    </div>
+    <div id="modal-qrcode" class="modal-overlay" style="display: none; z-index: 999999;">
+        <div class="modal-content" style="max-width: 300px; text-align: center; padding: 30px;">
+            <div class="modal-header" style="margin-bottom: 15px; justify-content: center;">
+                <h2 style="font-size: 1.2rem; color: var(--text-main);">Acesso Rápido Mobile</h2>
+                <button onclick="fecharQRCode()" class="btn-close"
+                    style="position: absolute; right: 20px; top: 20px;"><i class="ph ph-x"></i></button>
+            </div>
+            <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 20px;">Aponte a câmera do celular para
+                abrir o sistema.</p>
+            <div
+                style="background: white; padding: 15px; border-radius: 12px; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <img id="qr-imagem" src="" alt="QR Code" style="width: 200px; height: 200px; display: block;">
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL NOVO/EDITAR PEDIDO -->
+    <div id="modal-novo-pedido" class="modal-overlay" style="display: none; z-index: 1000;">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2 id="modal-pedido-titulo">Novo Pedido</h2>
+                <button onclick="fecharModalPedido()" class="btn-close"><i class="ph ph-x"></i></button>
+            </div>
+            <form id="form-pedido" onsubmit="salvarPedido(event)">
+                <input type="hidden" id="pedido-id">
+                <div class="input-group">
+                    <label>Nome do Cliente</label>
+                    <input type="text" id="pedido-cliente" required placeholder="Ex: Alexandre Silva">
+                </div>
+                <div class="input-group">
+                    <label>Endereço de Entrega</label>
+                    <input type="text" id="pedido-endereco" required placeholder="Ex: Av. Paulista, 1000 - São Paulo/SP">
+                </div>
+                <div class="input-group" style="margin-bottom: 15px;">
+                    <label>Descrição do Pedido (Itens/Observações)</label>
+                    <textarea id="pedido-descricao" rows="4" placeholder="Ex: 5 un Glock 9mm, 2 un Ferrolho Glock" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background-color: var(--bg-color); color: var(--text-main); font-family: inherit; resize: vertical;"></textarea>
+                </div>
+                <div class="form-grid" style="margin-bottom: 15px;">
+                    <div class="input-group">
+                        <label>Quantidade de Produtos</label>
+                        <input type="number" id="pedido-total-products" min="0" step="any" placeholder="Ex: 5" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Valor Total (R$)</label>
+                        <input type="number" id="pedido-total-value" min="0" step="0.01" placeholder="Ex: 1500.00" required>
+                    </div>
+                </div>
+                <div class="input-group" style="margin-bottom: 15px;">
+                    <label>Fornecedor Escolhido (Transportadora)</label>
+                    <input type="text" id="pedido-carrier" placeholder="Ex: Jadlog, Correios" required>
+                </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn-secondary" onclick="fecharModalCompra()">Cancelar</button>
-                    <button type="submit" class="btn-primary">Registrar Pedido</button>
+                    <button type="button" class="btn-secondary" onclick="fecharModalPedido()">Cancelar</button>
+                    <button type="submit" class="btn-primary">Salvar Pedido</button>
                 </div>
             </form>
         </div>
     </div>
+
+    <!-- MODAL VISUALIZAR COMPROVANTE -->
+    <div id="modal-comprovante" class="modal-overlay" style="display: none; z-index: 10000;" onclick="fecharModalComprovante()">
+        <div class="modal-content" style="max-width: 600px; padding: 15px; position: relative;" onclick="event.stopPropagation()">
+            <div class="modal-header" style="border: none; padding-bottom: 0;">
+                <h2 style="font-size: 1.1rem;">Comprovante de Envio</h2>
+                <button onclick="fecharModalComprovante()" class="btn-close" style="position: absolute; right: 15px; top: 15px;"><i class="ph ph-x"></i></button>
+            </div>
+            <div style="text-align: center; margin-top: 10px;">
+                <img id="imagem-comprovante-view" src="" style="max-width: 100%; max-height: 70vh; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL EXPORTAR PEDIDOS -->
+    <div id="modal-exportar-pedidos" class="modal-overlay" style="display: none; z-index: 1000;">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h2>Exportar Pedidos</h2>
+                <button type="button" onclick="fecharModalExportarPedidos()" class="btn-close"><i class="ph ph-x"></i></button>
+            </div>
+            <form onsubmit="processarExportarPedidos(event)">
+                <div class="input-group" style="margin-bottom: 20px;">
+                    <label>Filtro de Status</label>
+                    <select id="exportar-pedidos-status" required>
+                        <option value="todos">Todos os Pedidos</option>
+                        <option value="Fila">Em Fila (Preparação)</option>
+                        <option value="Enviado">Enviados (Concluídos)</option>
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" onclick="fecharModalExportarPedidos()">Cancelar</button>
+                    <button type="submit" class="btn-primary" style="background-color: #10b981;">Exportar Planilha</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
 </body>
+
 </html>

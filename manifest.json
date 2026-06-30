@@ -1,0 +1,18 @@
+{
+  "name": "360virtu stock",
+  "short_name": "360Stock",
+  "description": "Sistema de Gestão de Estoque Enterprise",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/new_virtu_logo_colored.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
